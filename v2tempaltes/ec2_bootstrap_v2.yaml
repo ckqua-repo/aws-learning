@@ -1,0 +1,36 @@
+Parameters:
+  InstanceName:
+    Type: String
+  LatestAmiId:
+    Description: Ensures latest AmiId is called whenever this stack is used
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+  s3BucketName:
+    Type: AWS::S3::Bucket::BucketName
+
+Resources:
+
+  BootstrappedEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: "t2.micro"
+      ImageId: !Ref LatestAmiId
+      SubnetId: !ImportValue PublicSubnetA-KwamesInternetPortal
+      SecurityGroupIds: [!ImportValue SG-A-KwamesInternetPortal]
+      Tags:
+        - Key: Name
+          Value: !Sub "${InstanceName}-${AWS::StackName}"
+        - Key: Region
+          Value: AWS::Region
+      UserData:
+        Fn::Base64: 
+          !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install httpd -y
+            service httpd start
+            chkconfig httpd on
+            cd /var/www/html
+            echo "<html><h1>Hello Cloud Gurus Welcome To My Webpage</h1></html>" > index.html
+            aws s3 mb s3://${s3BucketName}
+            aws s3 cp index.html s3://${s3BucketName}
